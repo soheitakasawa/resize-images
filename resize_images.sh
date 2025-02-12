@@ -18,6 +18,11 @@
 INPUT_DIR="before"
 OUTPUT_DIR="after"
 LOG_FILE="resize_log.txt"
+# Size configuration options
+SIZES=(
+    "1800,900"  # Original sizes
+    "1880,940"  # New sizes
+)
 
 # Ensure required tools are installed
 check_imagemagick_installed() {
@@ -38,15 +43,30 @@ prepare_output_dir() {
 # Process a single image file
 process_image() {
     local input_file="$1"
+    local size_option="$2"
+    IFS=',' read -r large_size small_size <<< "$size_option"
+    
     local base_name=$(basename "$input_file" | sed -E 's/\.(jpg|png|psd)$//i')
-    local output_2x="$OUTPUT_DIR/${base_name}@2x.jpg"
-    local output_900="$OUTPUT_DIR/${base_name}.jpg"
+    local output_2x="$OUTPUT_DIR/${base_name}_${large_size}@2x.jpg"
+    local output_small="$OUTPUT_DIR/${base_name}_${small_size}.jpg"
 
-    # Resize to 1800px
-    magick "$input_file" -resize 1800x "$output_2x" && echo "$(date): Resized to 1800px: $output_2x" >> "$LOG_FILE"
+    # Resize to large size
+    magick "$input_file" -resize "${large_size}x" "$output_2x" && echo "$(date): Resized to ${large_size}px: $output_2x" >> "$LOG_FILE"
 
-    # Resize to 900px
-    magick "$input_file" -resize 900x "$output_900" && echo "$(date): Resized to 900px: $output_900" >> "$LOG_FILE"
+    # Resize to small size
+    magick "$input_file" -resize "${small_size}x" "$output_small" && echo "$(date): Resized to ${small_size}px: $output_small" >> "$LOG_FILE"
+}
+
+# Let user select size option
+select_size_option() {
+    while true; do
+        read -p "サイズオプションを選択してください (1 または 2): " choice
+        case $choice in
+            1) echo "${SIZES[0]}"; return ;;
+            2) echo "${SIZES[1]}"; return ;;
+            *) echo "無効な選択です。1 または 2 を入力してください。" ;;
+        esac
+    done
 }
 
 # Process all images in the input directory
@@ -66,10 +86,17 @@ process_images() {
         exit 1
     fi
 
-    # Process each file
+    # Get size option from user
+    echo "利用可能なサイズオプション:"
+    echo "1) 1800px(@2x) / 900px"
+    echo "2) 1880px(@2x) / 940px"
+    local selected_size=$(select_size_option)
+
+    # Process each file with selected size option
     for file in "${files[@]}"; do
         if [ -f "$file" ]; then
-            process_image "$file"
+            echo "Processing $file..."
+            process_image "$file" "$selected_size"
         fi
     done
 }
